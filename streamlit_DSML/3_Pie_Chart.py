@@ -7,7 +7,7 @@ from pathlib import Path
 st.title("Science Fiction Franchise Popularity")
 
 # Locate and read the CSV file
-DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "Pie_demo.csv"
+DATA_PATH = Path(__file__).resolve().parent.parent / "Data" / "Pie_demo.csv"
 df = pd.read_csv(DATA_PATH)
 
 # Display the dataset
