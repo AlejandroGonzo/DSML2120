@@ -1,1 +1,2 @@
 Put your_photo.jpg phto/images in this folder; then set PHOTO_PATH = "assets/your_photo.jpg"
+
