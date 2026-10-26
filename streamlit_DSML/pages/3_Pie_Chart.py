@@ -19,7 +19,7 @@ fig = px.pie(
     df,
     names="Franchise",
     values="Popularity",
-    title="My Favorite Science Fiction Franchises"
+    title="Science Fiction Franchise Popularity Comparison"
 )
 
 # Display the pie chart
