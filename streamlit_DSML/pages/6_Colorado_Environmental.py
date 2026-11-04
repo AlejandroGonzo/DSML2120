@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -7,102 +8,149 @@ from pathlib import Path
 st.set_page_config(
     page_title="Colorado Environmental Dashboard",
     page_icon="🏔️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# ---- Load CSV Files ----
-data_folder = Path(__file__).resolve().parent.parent / "Data"
+# ---- Dark Theme ----
+st.markdown("""
+<style>
+.stApp {
+    background-color: #0B1220;
+    color: #E8EEF7;
+}
+.block-container {
+    max-width: 1500px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
+[data-testid="stSidebar"] {
+    background-color: #111D30;
+}
+h1, h2, h3 {
+    color: #F1F5FA;
+}
+[data-testid="stMetric"] {
+    background-color: #16243A;
+    border: 1px solid #30425B;
+    border-radius: 12px;
+    padding: 18px;
+}
+[data-testid="stMetricValue"] {
+    color: #73D7D0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---- Load Data ----
+DATA_FOLDER = Path(__file__).resolve().parent.parent / "Data"
 
 @st.cache_data
 def load_data():
-    air = pd.read_csv(data_folder / "colorado_air_quality.csv")
-    energy = pd.read_csv(data_folder / "home_energy_use.csv")
+    air = pd.read_csv(
+        DATA_FOLDER / "colorado_air_quality.csv"
+    )
+    energy = pd.read_csv(
+        DATA_FOLDER / "home_energy_use.csv"
+    )
 
     air["date"] = pd.to_datetime(air["date"])
     energy["month"] = pd.to_datetime(energy["month"])
 
     return air, energy
 
-air_quality, energy = load_data()
+try:
+    air_quality, energy = load_data()
+except (FileNotFoundError, ValueError) as error:
+    st.error(f"Unable to load the datasets: {error}")
+    st.stop()
 
-# ---- Dashboard Title ----
-st.title("🏔️ Colorado Environmental Dashboard")
-
-st.write(
-    "Exploring air quality, weather, and household "
-    "energy consumption across Colorado during 2025."
-)
-
-st.caption(
-    "Data source: Synthetic classroom datasets. "
-    "Results do not represent actual Colorado measurements."
-)
-
-# ---- Sidebar Filters ----
-st.sidebar.header("🔎 Dashboard Filters")
-
-if st.sidebar.button("🔄 Reset Filters"):
-    st.session_state["reset_filters"] = True
-
-if st.session_state.pop("reset_filters", False):
+# ---- Reset Filters ----
+def reset_filters():
     for key in [
         "city_filter",
         "month_filter",
+        "region_filter",
         "home_filter",
         "ev_filter",
-        "solar_filter",
-        "region_filter"
+        "solar_filter"
     ]:
         st.session_state.pop(key, None)
 
-st.sidebar.subheader("🌤️ Air Quality")
+# ---- Sidebar Filters ----
+with st.sidebar:
+    st.title("🏔️ Dashboard Filters")
 
-selected_cities = st.sidebar.multiselect(
-    "Select Cities",
-    options=sorted(air_quality["city"].unique()),
-    default=sorted(air_quality["city"].unique()),
-    key="city_filter"
-)
+    st.caption("Explore Colorado environmental data")
 
-st.sidebar.subheader("📅 Time Period")
+    st.button(
+        "🔄 Reset Filters",
+        on_click=reset_filters,
+        use_container_width=True
+    )
 
-month_range = st.sidebar.slider(
-    "Select Months",
-    min_value=1,
-    max_value=12,
-    value=(1, 12),
-    key="month_filter"
-)
+    st.divider()
+    st.subheader("🌤️ Air Quality")
 
-st.sidebar.subheader("🏠 Home Energy")
+    cities = sorted(air_quality["city"].dropna().unique())
 
-selected_regions = st.sidebar.multiselect(
-    "Select Regions",
-    options=sorted(energy["region"].unique()),
-    default=sorted(energy["region"].unique()),
-    key="region_filter"
-)
+    selected_cities = st.multiselect(
+        "Colorado Cities",
+        options=cities,
+        default=cities,
+        key="city_filter"
+    )
 
-selected_home_types = st.sidebar.multiselect(
-    "Select Home Types",
-    options=sorted(energy["home_type"].unique()),
-    default=sorted(energy["home_type"].unique()),
-    key="home_filter"
-)
+    st.subheader("📅 Time Period")
 
-selected_ev = st.sidebar.selectbox(
-    "Electric Vehicle Ownership",
-    ["All Households", "Yes", "No"],
-    key="ev_filter"
-)
+    month_range = st.slider(
+        "Months of 2025",
+        min_value=1,
+        max_value=12,
+        value=(1, 12),
+        key="month_filter"
+    )
 
-selected_solar = st.sidebar.selectbox(
-    "Solar Panel Ownership",
-    ["All Households", "Yes", "No"],
-    key="solar_filter"
-)
+    st.divider()
+    st.subheader("⚡ Home Energy")
 
-# ---- Filter Datasets ----
+    regions = sorted(energy["region"].dropna().unique())
+
+    selected_regions = st.multiselect(
+        "Colorado Regions",
+        options=regions,
+        default=regions,
+        key="region_filter"
+    )
+
+    with st.expander("Additional Filters"):
+        home_types = sorted(
+            energy["home_type"].dropna().unique()
+        )
+
+        selected_home_types = st.multiselect(
+            "Home Types",
+            options=home_types,
+            default=home_types,
+            key="home_filter"
+        )
+
+        selected_ev = st.selectbox(
+            "Electric Vehicle Ownership",
+            ["All Households", "Yes", "No"],
+            key="ev_filter"
+        )
+
+        selected_solar = st.selectbox(
+            "Solar Panel Ownership",
+            ["All Households", "Yes", "No"],
+            key="solar_filter"
+        )
+
+    st.divider()
+    st.caption("Synthetic classroom datasets, 2025")
+
+# ---- Filter Data ----
 filtered_air = air_quality[
     air_quality["city"].isin(selected_cities)
     & air_quality["date"].dt.month.between(
@@ -130,12 +178,63 @@ if selected_solar != "All Households":
 
 if filtered_air.empty or filtered_energy.empty:
     st.warning(
-        "No data available for these filters. "
-        "Please change your selections."
+        "No data matches your selected filters. "
+        "Please adjust your selections."
     )
     st.stop()
 
-# ---- KPI Cards ----
+# ---- Chart Styling ----
+COLORS = {
+    "blue": "#62A8F7",
+    "teal": "#55D6C2",
+    "purple": "#AE91FA",
+    "orange": "#F5B66C",
+    "red": "#F27C83"
+}
+
+def style_chart(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        height=350,
+        margin=dict(l=15, r=15, t=20, b=35),
+        paper_bgcolor="#16243A",
+        plot_bgcolor="#16243A",
+        font=dict(size=12, color="#E8EEF7"),
+        legend=dict(
+            orientation="h",
+            y=-0.3,
+            x=0
+        )
+    )
+
+    fig.update_xaxes(
+        showgrid=False,
+        automargin=True
+    )
+
+    fig.update_yaxes(
+        gridcolor="#30425B",
+        automargin=True
+    )
+
+    return fig
+
+# ---- Dashboard Header ----
+st.title("🏔️ Colorado Environmental Dashboard")
+
+st.write(
+    "Explore how wildfire smoke, temperature, "
+    "home types, and electric vehicles relate "
+    "to air quality and electricity use in Colorado."
+)
+
+st.caption(
+    "2025 | Colorado | Synthetic classroom data"
+)
+
+st.divider()
+
+# ---- KPI Overview ----
 st.header("📊 Environmental Overview")
 
 average_aqi = filtered_air["aqi"].mean()
@@ -153,305 +252,377 @@ solar_percentage = (
     if total_households > 0 else 0
 )
 
-kpi1, kpi2, kpi3 = st.columns(3)
+kpi1, kpi2, kpi3 = st.columns(3, gap="medium")
 
 with kpi1:
     st.metric(
-        "🌤️ Average AQI",
+        "Average Air Quality Index",
         f"{average_aqi:.1f}"
     )
 
 with kpi2:
     st.metric(
-        "⚡ Average Energy Use",
+        "Average Electricity Use",
         f"{average_energy:,.0f} kWh"
     )
 
 with kpi3:
     st.metric(
-        "🌱 Solar Adoption",
+        "Households With Solar",
         f"{solar_percentage:.1f}%"
     )
 
+st.caption(
+    "Metrics update with the selected filters. "
+    "Electricity use is averaged per household-month."
+)
+
 st.divider()
 
-# ---- Row 1: Air Quality Analysis ----
+# ---- Air Quality Analysis ----
 st.header("🌤️ Colorado Air Quality Analysis")
 
 col1, col2 = st.columns(2, gap="large")
 
 # ---- Question 1 ----
 with col1:
-    st.subheader(
-        "Q1: Does wildfire smoke make Colorado's air quality worse?"
-    )
+    with st.container(border=True):
+        st.subheader("Wildfire Smoke vs. Air Quality")
 
-    smoke_data = (
-        filtered_air.groupby(
-            "wildfire_smoke", as_index=False
-        )["aqi"]
-        .mean()
-    )
+        st.write(
+            "Does wildfire smoke make Colorado's "
+            "air quality worse?"
+        )
 
-    smoke_data["wildfire_smoke"] = smoke_data[
-        "wildfire_smoke"
-    ].replace({
-        "Yes": "Smoke",
-        "No": "No Smoke"
-    })
+        smoke_data = (
+            filtered_air.groupby(
+                "wildfire_smoke",
+                as_index=False
+            )["aqi"].mean()
+        )
 
-    fig1 = px.bar(
-        smoke_data,
-        x="wildfire_smoke",
-        y="aqi",
-        color="wildfire_smoke",
-        color_discrete_map={
-            "Smoke": "#FF6B6B",
-            "No Smoke": "#4DA8FF"
-        },
-        labels={
-            "wildfire_smoke": "Wildfire Smoke",
-            "aqi": "Average Air Quality Index"
-        },
-        text_auto=".1f"
-    )
+        smoke_data["group"] = smoke_data[
+            "wildfire_smoke"
+        ].replace({
+            "Yes": "Smoke",
+            "No": "No Smoke"
+        })
 
-    fig1.update_layout(
-        showlegend=False,
-        height=350,
-        template="plotly_dark"
-    )
+        fig1 = px.bar(
+            smoke_data,
+            x="group",
+            y="aqi",
+            color="group",
+            color_discrete_map={
+                "Smoke": COLORS["red"],
+                "No Smoke": COLORS["blue"]
+            },
+            text_auto=".1f",
+            labels={
+                "group": "Wildfire Smoke",
+                "aqi": "Average AQI"
+            }
+        )
 
-    st.plotly_chart(
-        fig1,
-        use_container_width=True
-    )
+        fig1.update_layout(showlegend=False)
 
-    st.caption(
-        "Columns: wildfire_smoke, aqi | Chart: Bar chart"
-    )
+        st.plotly_chart(
+            style_chart(fig1),
+            use_container_width=True
+        )
+
+        st.caption(
+            "Average Air Quality Index (AQI) with "
+            "and without wildfire smoke. "
+            "Higher AQI means worse air quality."
+        )
 
 # ---- Question 2 ----
 with col2:
-    st.subheader(
-        "Q2: Is temperature related to air pollution in Colorado?"
-    )
+    with st.container(border=True):
+        st.subheader("Temperature vs. Air Pollution")
 
-    pollution_data = filtered_air.dropna(
-        subset=["temp_f", "pm25_ugm3"]
-    )
+        st.write(
+            "Is there a relationship between "
+            "temperature and air pollution in Colorado?"
+        )
 
-    fig2 = px.scatter(
-        pollution_data,
-        x="temp_f",
-        y="pm25_ugm3",
-        color="city",
-        opacity=0.65,
-        labels={
-            "temp_f": "Temperature (°F)",
-            "pm25_ugm3": "PM2.5 (µg/m³)",
-            "city": "City"
-        },
-        hover_data=["date"]
-    )
+        pollution_data = filtered_air.dropna(
+            subset=["temp_f", "pm25_ugm3"]
+        )
 
-    fig2.update_layout(
-        height=350,
-        template="plotly_dark"
-    )
+        fig2 = px.scatter(
+            pollution_data,
+            x="temp_f",
+            y="pm25_ugm3",
+            color="city",
+            opacity=0.65,
+            labels={
+                "temp_f": "Temperature (°F)",
+                "pm25_ugm3": "PM2.5 (µg/m³)",
+                "city": "City"
+            },
+            hover_data=["date"]
+        )
 
-    st.plotly_chart(
-        fig2,
-        use_container_width=True
-    )
+        st.plotly_chart(
+            style_chart(fig2),
+            use_container_width=True
+        )
 
-    st.caption(
-        "Columns: temp_f, pm25_ugm3 | Chart: Scatter plot"
-    )
+        st.caption(
+            "Each point represents one city-day. "
+            "PM2.5 measures fine particle pollution "
+            "in micrograms per cubic meter."
+        )
 
 st.divider()
 
-# ---- Row 2: Home Energy Analysis ----
+# ---- Home Energy Analysis ----
 st.header("⚡ Colorado Home Energy Analysis")
 
 col3, col4 = st.columns(2, gap="large")
 
 # ---- Question 3 ----
 with col3:
-    st.subheader(
-        "Q3: Do different types of homes use different amounts of electricity?"
-    )
+    with st.container(border=True):
+        st.subheader("Electricity Use by Home Type")
 
-    home_data = (
-        filtered_energy.groupby(
-            "home_type", as_index=False
-        )["kwh_used"]
-        .mean()
-        .sort_values("kwh_used", ascending=False)
-    )
+        st.write(
+            "Do different types of homes use "
+            "different amounts of electricity?"
+        )
 
-    fig3 = px.bar(
-        home_data,
-        x="home_type",
-        y="kwh_used",
-        color="home_type",
-        labels={
-            "home_type": "Home Type",
-            "kwh_used": "Average Electricity Use (kWh)"
-        },
-        text_auto=".0f"
-    )
+        home_data = (
+            filtered_energy.groupby(
+                "home_type",
+                as_index=False
+            )["kwh_used"]
+            .mean()
+            .sort_values(
+                "kwh_used",
+                ascending=False
+            )
+        )
 
-    fig3.update_layout(
-        showlegend=False,
-        height=350,
-        template="plotly_dark"
-    )
+        fig3 = px.bar(
+            home_data,
+            x="home_type",
+            y="kwh_used",
+            text_auto=".0f",
+            color_discrete_sequence=[COLORS["teal"]],
+            labels={
+                "home_type": "Home Type",
+                "kwh_used": "Average Electricity Use (kWh)"
+            }
+        )
 
-    st.plotly_chart(
-        fig3,
-        use_container_width=True
-    )
+        st.plotly_chart(
+            style_chart(fig3),
+            use_container_width=True
+        )
 
-    st.caption(
-        "Columns: home_type, kwh_used | Chart: Bar chart"
-    )
+        st.caption(
+            "Average monthly electricity use "
+            "in kilowatt-hours (kWh) by home type."
+        )
 
 # ---- Question 4 ----
 with col4:
-    st.subheader(
-        "Q4: Do households with electric vehicles use more electricity?"
-    )
+    with st.container(border=True):
+        st.subheader("Electric Vehicles & Energy Use")
 
-    ev_data = (
-        filtered_energy.groupby(
-            "has_ev", as_index=False
-        )["kwh_used"]
-        .mean()
-    )
+        st.write(
+            "Do households with electric vehicles "
+            "use more electricity than those without?"
+        )
 
-    ev_data["has_ev"] = ev_data["has_ev"].replace({
-        "Yes": "Has EV",
-        "No": "No EV"
-    })
+        ev_data = (
+            filtered_energy.groupby(
+                "has_ev",
+                as_index=False
+            )["kwh_used"].mean()
+        )
 
-    fig4 = px.bar(
-        ev_data,
-        x="has_ev",
-        y="kwh_used",
-        color="has_ev",
-        color_discrete_map={
-            "Has EV": "#A66BFF",
-            "No EV": "#4DA8FF"
-        },
-        labels={
-            "has_ev": "Electric Vehicle Ownership",
-            "kwh_used": "Average Electricity Use (kWh)"
-        },
-        text_auto=".0f"
-    )
+        ev_data["group"] = ev_data["has_ev"].replace({
+            "Yes": "Has EV",
+            "No": "No EV"
+        })
 
-    fig4.update_layout(
-        showlegend=False,
-        height=350,
-        template="plotly_dark"
-    )
+        fig4 = px.bar(
+            ev_data,
+            x="group",
+            y="kwh_used",
+            color="group",
+            color_discrete_map={
+                "Has EV": COLORS["purple"],
+                "No EV": COLORS["blue"]
+            },
+            text_auto=".0f",
+            labels={
+                "group": "EV Ownership",
+                "kwh_used": "Average Electricity Use (kWh)"
+            }
+        )
 
-    st.plotly_chart(
-        fig4,
-        use_container_width=True
-    )
+        fig4.update_layout(showlegend=False)
 
-    st.caption(
-        "Columns: has_ev, kwh_used | Chart: Bar chart"
-    )
+        st.plotly_chart(
+            style_chart(fig4),
+            use_container_width=True
+        )
+
+        st.caption(
+            "Average monthly electricity use "
+            "for households with and without "
+            "electric vehicles (EVs)."
+        )
 
 st.divider()
 
 # ---- Key Insights ----
 st.header("💡 Key Insights")
 
-insight1, insight2, insight3 = st.columns(3)
+smoke_lookup = smoke_data.set_index("group")["aqi"]
+ev_lookup = ev_data.set_index("group")["kwh_used"]
+
+insight1, insight2 = st.columns(2, gap="large")
 
 with insight1:
-    st.subheader("🔥 Wildfire Smoke")
+    with st.container(border=True):
+        st.subheader("🔥 Wildfire Smoke")
 
-    smoke_lookup = smoke_data.set_index(
-        "wildfire_smoke"
-    )["aqi"]
+        if {"Smoke", "No Smoke"}.issubset(
+            smoke_lookup.index
+        ):
+            smoke_avg = smoke_lookup["Smoke"]
+            no_smoke_avg = smoke_lookup["No Smoke"]
+            difference = smoke_avg - no_smoke_avg
 
-    if {"Smoke", "No Smoke"}.issubset(smoke_lookup.index):
-        smoke_avg = smoke_lookup["Smoke"]
-        no_smoke_avg = smoke_lookup["No Smoke"]
+            st.write(
+                f"Average AQI is {smoke_avg:.1f} "
+                f"with smoke and {no_smoke_avg:.1f} "
+                "without smoke."
+            )
 
-        st.write(
-            f"Average AQI with smoke: **{smoke_avg:.1f}**"
-        )
-
-        st.write(
-            f"Average AQI without smoke: **{no_smoke_avg:.1f}**"
-        )
-    else:
-        st.write(
-            "Both smoke and non-smoke observations "
-            "are needed for comparison."
-        )
+            st.write(
+                f"Difference: {difference:+.1f} AQI points."
+            )
+        else:
+            st.write(
+                "Both smoke groups are needed "
+                "for comparison."
+            )
 
 with insight2:
-    st.subheader("🏠 Home Energy")
+    with st.container(border=True):
+        st.subheader("🌡️ Temperature & Pollution")
 
-    highest_home = home_data.iloc[0]
+        if len(pollution_data) >= 2:
+            correlation = pollution_data[
+                ["temp_f", "pm25_ugm3"]
+            ].corr().iloc[0, 1]
 
-    st.write(
-        f"**{highest_home['home_type']}** homes have "
-        "the highest average electricity use "
-        "among the selected home types."
-    )
+            if pd.notna(correlation):
+                st.write(
+                    "The correlation between temperature "
+                    f"and PM2.5 is {correlation:.2f}."
+                )
 
-    st.write(
-        f"Average: **{highest_home['kwh_used']:,.0f} kWh**"
-    )
+                st.write(
+                    "A value near zero suggests a "
+                    "weak linear relationship."
+                )
+            else:
+                st.write(
+                    "Not enough variation to calculate "
+                    "a correlation."
+                )
+        else:
+            st.write(
+                "Not enough observations to calculate "
+                "a correlation."
+            )
+
+insight3, insight4 = st.columns(2, gap="large")
 
 with insight3:
-    st.subheader("🚗 Electric Vehicles")
+    with st.container(border=True):
+        st.subheader("🏠 Home Types")
 
-    ev_lookup = ev_data.set_index("has_ev")["kwh_used"]
-
-    if {"Has EV", "No EV"}.issubset(ev_lookup.index):
-        ev_avg = ev_lookup["Has EV"]
-        no_ev_avg = ev_lookup["No EV"]
-
-        difference = ev_avg - no_ev_avg
+        highest_home = home_data.iloc[0]
 
         st.write(
-            f"Households with EVs average **{ev_avg:,.0f} kWh**."
+            f"{highest_home['home_type']} homes have "
+            "the highest average electricity use "
+            "among the selected home types."
         )
 
         st.write(
-            f"Households without EVs average "
-            f"**{no_ev_avg:,.0f} kWh**."
+            f"Average use: "
+            f"{highest_home['kwh_used']:,.0f} kWh per month."
         )
 
-        st.write(
-            f"Difference: **{difference:+,.0f} kWh**"
-        )
-    else:
-        st.write(
-            "Select both EV ownership groups "
-            "to compare their electricity use."
-        )
+with insight4:
+    with st.container(border=True):
+        st.subheader("🚗 Electric Vehicles")
+
+        if {"Has EV", "No EV"}.issubset(
+            ev_lookup.index
+        ):
+            ev_avg = ev_lookup["Has EV"]
+            no_ev_avg = ev_lookup["No EV"]
+            difference = ev_avg - no_ev_avg
+
+            st.write(
+                f"Households with EVs average "
+                f"{ev_avg:,.0f} kWh per month."
+            )
+
+            st.write(
+                f"Households without EVs average "
+                f"{no_ev_avg:,.0f} kWh per month."
+            )
+
+            st.write(
+                f"Difference: {difference:+,.0f} kWh."
+            )
+        else:
+            st.write(
+                "Both EV ownership groups are needed "
+                "for comparison."
+            )
+
+st.caption(
+    "These results show associations in synthetic "
+    "data, not proof of cause and effect."
+)
+
+# ---- Missing Data Handling ----
+missing_pm25 = air_quality["pm25_ugm3"].isna().sum()
+
+st.caption(
+    f"Missing-data handling: {missing_pm25} PM2.5 "
+    "readings are missing from the original dataset. "
+    "Those rows are excluded only from the "
+    "temperature-versus-pollution chart and "
+    "correlation calculation. Other available "
+    "observations are retained."
+)
 
 st.divider()
 
 # ---- Dataset Explorer ----
-st.header("📁 Explore the Data")
+st.header("📁 Explore the Datasets")
 
 tab1, tab2 = st.tabs([
-    "🌤️ Air Quality Dataset",
-    "⚡ Home Energy Dataset"
+    "Air Quality Data",
+    "Home Energy Data"
 ])
 
 with tab1:
+    st.write("Colorado Air Quality Dataset")
+
     st.dataframe(
         filtered_air,
         use_container_width=True,
@@ -459,13 +630,16 @@ with tab1:
     )
 
     st.download_button(
-        "Download Air Quality Data",
-        filtered_air.to_csv(index=False),
-        file_name="filtered_air_quality.csv",
-        mime="text/csv"
+        "Download Filtered Air Quality CSV",
+        data=filtered_air.to_csv(index=False).encode("utf-8"),
+        file_name="filtered_colorado_air_quality.csv",
+        mime="text/csv",
+        key="download_air"
     )
 
 with tab2:
+    st.write("Colorado Home Energy Dataset")
+
     st.dataframe(
         filtered_energy,
         use_container_width=True,
@@ -473,37 +647,44 @@ with tab2:
     )
 
     st.download_button(
-        "Download Home Energy Data",
-        filtered_energy.to_csv(index=False),
-        file_name="filtered_home_energy.csv",
-        mime="text/csv"
+        "Download Filtered Home Energy CSV",
+        data=filtered_energy.to_csv(index=False).encode("utf-8"),
+        file_name="filtered_home_energy_use.csv",
+        mime="text/csv",
+        key="download_energy"
     )
 
-# ---- Dashboard Information ----
+# ---- About Dashboard ----
 with st.expander("ℹ️ About This Dashboard"):
     st.write(
-        "This dashboard uses two synthetic datasets "
-        "created for DSML 2120."
+        "This dashboard uses two synthetic 2025 "
+        "Colorado classroom datasets: "
+        "colorado_air_quality.csv and home_energy_use.csv."
     )
 
     st.write(
-        "The Colorado Air Quality dataset contains "
-        "information about pollution, temperature, "
-        "and wildfire smoke."
+        "The air quality dataset contains daily "
+        "observations for six Colorado cities."
     )
 
     st.write(
-        "The Home Energy dataset contains information "
-        "about electricity consumption, home types, "
-        "solar panels, and electric vehicles."
+        "The home energy dataset contains monthly "
+        "household electricity consumption and "
+        "information about home types, solar panels, "
+        "and electric vehicles."
     )
 
     st.write(
-        "All charts use filtered data and update "
-        "when sidebar selections change."
+        "The datasets are analyzed separately. "
+        "They are not joined together."
     )
 
     st.write(
-        "Comparisons show relationships in the data "
-        "and do not prove cause and effect."
+        "Sidebar filters update the charts, metrics, "
+        "insights, and data tables."
+    )
+
+    st.write(
+        "The dashboard is for educational purposes "
+        "and does not represent real Colorado measurements."
     )
