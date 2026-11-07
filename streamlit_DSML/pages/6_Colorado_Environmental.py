@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -12,33 +11,84 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---- Dark Theme ----
+# ---- Accessible Dark Theme ----
 st.markdown("""
 <style>
 .stApp {
     background-color: #0B1220;
-    color: #E8EEF7;
+    color: #F1F5F9;
 }
+
 .block-container {
     max-width: 1500px;
     padding-top: 2rem;
     padding-bottom: 3rem;
 }
+
 [data-testid="stSidebar"] {
     background-color: #111D30;
 }
-h1, h2, h3 {
-    color: #F1F5FA;
+
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #F1F5F9 !important;
 }
+
+[data-testid="stSidebarNav"] span,
+[data-testid="stSidebarNav"] a {
+    color: #F1F5F9 !important;
+}
+
+h1, h2, h3 {
+    color: #F8FAFC !important;
+}
+
 [data-testid="stMetric"] {
     background-color: #16243A;
-    border: 1px solid #30425B;
+    border: 1px solid #52647B;
     border-radius: 12px;
     padding: 18px;
 }
-[data-testid="stMetricValue"] {
-    color: #73D7D0;
+
+[data-testid="stMetricLabel"],
+[data-testid="stMetricLabel"] p,
+[data-testid="stMetricLabel"] div {
+    color: #F1F5F9 !important;
 }
+
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] div {
+    color: #73D7D0 !important;
+}
+
+[data-testid="stMarkdownContainer"] p {
+    color: #E2E8F0;
+}
+
+[data-testid="stCaptionContainer"] p {
+    color: #CBD5E1 !important;
+}
+
+div.stButton > button {
+    background-color: #243B55;
+    color: #FFFFFF !important;
+    border: 1px solid #64748B;
+    border-radius: 8px;
+}
+
+div.stButton > button:hover {
+    background-color: #365574;
+    color: #FFFFFF !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: #52647B;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -80,7 +130,6 @@ def reset_filters():
 # ---- Sidebar Filters ----
 with st.sidebar:
     st.title("🏔️ Dashboard Filters")
-
     st.caption("Explore Colorado environmental data")
 
     st.button(
@@ -92,7 +141,9 @@ with st.sidebar:
     st.divider()
     st.subheader("🌤️ Air Quality")
 
-    cities = sorted(air_quality["city"].dropna().unique())
+    cities = sorted(
+        air_quality["city"].dropna().unique()
+    )
 
     selected_cities = st.multiselect(
         "Colorado Cities",
@@ -114,7 +165,9 @@ with st.sidebar:
     st.divider()
     st.subheader("⚡ Home Energy")
 
-    regions = sorted(energy["region"].dropna().unique())
+    regions = sorted(
+        energy["region"].dropna().unique()
+    )
 
     selected_regions = st.multiselect(
         "Colorado Regions",
@@ -199,7 +252,10 @@ def style_chart(fig):
         margin=dict(l=15, r=15, t=20, b=35),
         paper_bgcolor="#16243A",
         plot_bgcolor="#16243A",
-        font=dict(size=12, color="#E8EEF7"),
+        font=dict(
+            size=13,
+            color="#F1F5F9"
+        ),
         legend=dict(
             orientation="h",
             y=-0.3,
@@ -209,12 +265,16 @@ def style_chart(fig):
 
     fig.update_xaxes(
         showgrid=False,
-        automargin=True
+        automargin=True,
+        tickfont=dict(color="#F1F5F9"),
+        title_font=dict(color="#F1F5F9")
     )
 
     fig.update_yaxes(
-        gridcolor="#30425B",
-        automargin=True
+        gridcolor="#52647B",
+        automargin=True,
+        tickfont=dict(color="#F1F5F9"),
+        title_font=dict(color="#F1F5F9")
     )
 
     return fig
@@ -356,7 +416,7 @@ with col2:
             x="temp_f",
             y="pm25_ugm3",
             color="city",
-            opacity=0.65,
+            opacity=0.75,
             labels={
                 "temp_f": "Temperature (°F)",
                 "pm25_ugm3": "PM2.5 (µg/m³)",
